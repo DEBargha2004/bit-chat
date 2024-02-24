@@ -63,12 +63,12 @@ export default function ChatBox ({ className }: { className?: string }) {
               >
                 <UserCircle2
                   className={cn(
-                    'text-slate-300',
+                    'text-slate-300 shrink-0',
                     messages[message_idx - 1]?.user_id === message.user_id &&
                       'opacity-0'
                   )}
                 />
-                <div className={`p-2 rounded-lg bg-muted space-y-2`}>
+                <div className={`p-2 rounded-lg bg-muted space-y-2 `}>
                   {message.messages.map(m => (
                     <MessageComponent data={m.data} type={m.type} />
                   ))}
