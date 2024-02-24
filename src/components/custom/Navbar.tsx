@@ -3,10 +3,12 @@
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
+import useGlobalAppState from '@/hooks/use-global-app-state'
 
 const Switch = dynamic(() => import('./Switch'), { ssr: false })
 
 export default function Navbar ({ className }: { className?: string }) {
+  const { online_count } = useGlobalAppState()
   return (
     <section
       className={cn(
@@ -20,6 +22,7 @@ export default function Navbar ({ className }: { className?: string }) {
         width={30}
         alt='app-icon'
       />
+      <span className='font-medium'>{online_count} online</span>
       <Switch />
     </section>
   )
