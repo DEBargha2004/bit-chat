@@ -4,13 +4,18 @@ import { cn } from '@/lib/utils'
 import MessageInput from './MessageInput'
 import { useEffect, useRef } from 'react'
 import useGlobalAppState from '@/hooks/use-global-app-state'
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
+import {
+  collection,
+  limit,
+  onSnapshot,
+  orderBy,
+  query
+} from 'firebase/firestore'
 import { db } from '../../../firebase.config'
 import { MessageType } from '@/providers/global-app-state-provider'
 import MessageWrapper from './MessageWrapper'
 import { UserCircle2 } from 'lucide-react'
 import MessageComponent from './MessageComponent'
-import { ScrollArea } from '../ui/scroll-area'
 import MessageContainer from './MessageContainer'
 
 export default function ChatBox ({ className }: { className?: string }) {
@@ -20,14 +25,18 @@ export default function ChatBox ({ className }: { className?: string }) {
   useEffect(() => {
     if (!_id) return
 
-    const q = query(collection(db, 'messages'), orderBy('createdAt', 'asc'))
+    const q = query(
+      collection(db, 'messages'),
+      orderBy('createdAt', 'desc'),
+      limit(30)
+    )
     const unsubscribe = onSnapshot(q, q_snapshot => {
       const messages_arr: MessageType[] = []
       q_snapshot.forEach(doc => {
         messages_arr.push({ ...doc.data(), id: doc.id } as MessageType)
       })
 
-      setMessages(messages_arr)
+      setMessages(messages_arr.reverse())
     })
 
     return () => unsubscribe()
