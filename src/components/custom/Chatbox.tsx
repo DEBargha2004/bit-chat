@@ -53,9 +53,9 @@ export default function ChatBox ({ className }: { className?: string }) {
   return (
     <>
       <section className={cn('h-full', className)}>
-        <MessageContainer
+        <div
           ref={scrollAreaRef}
-          className='h-[90%] flex flex-col w-full p-3 scroller'
+          className='h-[90%] flex flex-col w-full p-3 scroller overflow-y-auto'
         >
           {messages.map((message, message_idx) => (
             <MessageWrapper
@@ -78,17 +78,19 @@ export default function ChatBox ({ className }: { className?: string }) {
                   )}
                 />
                 <div className={`p-2 rounded-lg bg-muted space-y-2 `}>
-                  {message.messages.map(m => (
-                    <MessageComponent data={m.data} type={m.type} />
+                  {message.messages.map((m, m_idx) => (
+                    <MessageComponent data={m.data} type={m.type} key={m_idx} />
                   ))}
                 </div>
               </div>
             </MessageWrapper>
           ))}
+
           {/* <div className='w-full flex justify-center items-center text-sm dark:text-slate-300 text-slate-600'>
             <span>Messages will automatically deleted after 12:00 AM</span>
           </div> */}
-        </MessageContainer>
+        </div>
+        {/* <div className='h-[10%] w-full bg-red-400'></div> */}
         <MessageInput className='h-[10%]' />
       </section>
     </>

@@ -3,19 +3,12 @@
 import ChatBox from '@/components/custom/Chatbox'
 import Navbar from '@/components/custom/Navbar'
 import useGlobalAppState from '@/hooks/use-global-app-state'
-import {
-  goOffline,
-  goOnline,
-  onDisconnect,
-  onValue,
-  ref,
-  set
-} from 'firebase/database'
+import { onDisconnect, onValue, ref, set } from 'firebase/database'
 import { useEffect } from 'react'
 import { realtimeDB } from '../../firebase.config'
 
 export default function Home () {
-  const { setId, setOnlineCount, online_count } = useGlobalAppState()
+  const { setId, setOnlineUsers } = useGlobalAppState()
   useEffect(() => {
     let id = sessionStorage.getItem('_id')
     if (!id) {
@@ -27,13 +20,14 @@ export default function Home () {
     }
 
     const connectionRef = ref(realtimeDB, 'active_users/' + id)
-    const connectionsRef = ref(realtimeDB, 'active_users')
-    onValue(connectionsRef, snapshot => {
+    const connections_Ref = ref(realtimeDB, 'active_users')
+    onValue(connections_Ref, snapshot => {
       const active_users = snapshot.val()
-      const keys = Object.keys(active_users)
-      setOnlineCount(keys.length)
+      console.log(active_users)
+
+      setOnlineUsers(active_users)
     })
-    set(connectionRef, 'online')
+    set(connectionRef, { status: 'online', typing: false })
     onDisconnect(connectionRef).remove()
     return () => {}
   }, [])

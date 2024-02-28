@@ -1,37 +1,64 @@
 'use client'
 
-import { ChangeEvent, FormEvent, useRef, useState } from 'react'
-import { Input } from '../ui/input'
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/button'
 import { cn } from '@/lib/utils'
-import { Paperclip, Send, X } from 'lucide-react'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
-import { bucket, db } from '../../../firebase.config'
+import { bucket, db, realtimeDB } from '../../../firebase.config'
 import useGlobalAppState from '@/hooks/use-global-app-state'
 import { useToast } from '@/components/ui/use-toast'
 import { ref, uploadBytes } from 'firebase/storage'
+import { useThrottle } from '@uidotdev/usehooks'
+import { ref as databaseRef, update } from 'firebase/database'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
+import { Image, Paperclip, Send, Video, X } from 'lucide-react'
+import MessageComponent from './MessageComponent'
+import { type MessageComponentType } from '@/providers/global-app-state-provider'
+import PreviewComponent from './PreviewComponent'
+
+export type PreviewFileType = 'image' | 'video' | 'audio'
 
 export default function MessageInput ({ className }: { className?: string }) {
   const [message, setMessage] = useState('')
-  const [image, setImage] = useState('')
+  const throttledMessage = useThrottle(message, 2000)
+  const [file, setFile] = useState<{
+    type: MessageComponentType['type'] | ''
+    data: string
+    storagePath: string
+  }>({ type: '', data: '', storagePath: '' })
   const { _id } = useGlobalAppState()
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  function handleImageChange (e: ChangeEvent<HTMLInputElement>) {
+  function handleFileChange (
+    e: ChangeEvent<HTMLInputElement>,
+    type: MessageComponentType['type'],
+    storagePath: string,
+    max_size: number,
+    label: string
+  ) {
     const file = e.target.files
     if (file) {
       const reader = new FileReader()
       reader.readAsDataURL(file[0])
       reader.onload = () => {
-        if (file[0].size > 1024 * 1024) {
+        if (file[0].size > max_size) {
           toast({
-            title: 'Image too large',
-            description: 'Image must be less than 1MB in size'
+            title: `${label} too large`,
+            description: `${label} must be less than ${
+              max_size / (1024 * 1024)
+            }MB in size`
           })
           imageInputRef.current!.value = ''
+          videoInputRef.current!.value = ''
         } else {
-          setImage(reader.result as string)
+          setFile({
+            type,
+            data: reader.result as string,
+            storagePath
+          })
         }
       }
     }
@@ -39,18 +66,18 @@ export default function MessageInput ({ className }: { className?: string }) {
 
   async function handleSubmit (e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!_id || !(message || image)) return
+    if (!_id || !(message || file.data)) return
 
     const message_container = []
-    if (image) {
-      const image_id = crypto.randomUUID()
+    if (file.data) {
+      const file_id = crypto.randomUUID()
       message_container.push({
-        type: 'image',
-        data: image_id
+        type: file.type,
+        data: file_id
       })
       await uploadBytes(
-        ref(bucket, `images/${image_id}`),
-        Buffer.from(image.split(',')[1] as string, 'base64')
+        ref(bucket, `${file.storagePath}/${file_id}`),
+        Buffer.from(file.data.split(',')[1] as string, 'base64')
       )
     }
 
@@ -68,46 +95,125 @@ export default function MessageInput ({ className }: { className?: string }) {
     })
 
     setMessage('')
-    setImage('')
+    setFile({ type: '', data: '', storagePath: '' })
   }
+
+  function handleMessageChange (e: ChangeEvent<HTMLInputElement>) {
+    setMessage(e.target.value)
+    if (inputRef.current) {
+      inputRef.current.style.height = inputRef.current.scrollHeight + 'px'
+    }
+  }
+
+  useEffect(() => {
+    if (!_id) return
+    const userRefRealtimeDB = databaseRef(realtimeDB, 'active_users/' + _id)
+    if (throttledMessage !== message) {
+      update(userRefRealtimeDB, {
+        typing: true
+      })
+    } else {
+      update(userRefRealtimeDB, {
+        typing: false
+      })
+    }
+  }, [throttledMessage, message, _id])
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={cn(
-        'flex justify-between items-center gap-1 relative',
-        className
-      )}
-    >
-      {image ? (
-        <div className='absolute bottom-full left-0 w-full p-2 hover:bg-accent rounded transition-all mb-2 flex justify-between items-start'>
-          <img src={image} className='h-16 rounded' />
-          <span>
-            <X className='h-4 cursor-pointer' onClick={() => setImage('')} />
-          </span>
-        </div>
-      ) : null}
-      <input
-        type='file'
-        className='hidden'
-        accept='image/*'
-        id='image'
-        ref={imageInputRef}
-        onChange={handleImageChange}
-      />
-      <label
-        htmlFor='image'
-        className='p-4 cursor-pointer hover:bg-muted rounded'
+    <form className={cn('w-full relative', className)} onSubmit={handleSubmit}>
+      <div
+        className={cn(
+          'absolute bottom-full left-2 dark:bg-slate-700 bg-slate-300 rounded w-full transition-all overflow-hidden',
+          file.data ? 'h-fit  p-2' : 'h-0'
+        )}
       >
-        <Paperclip />
-      </label>
-      <Input
+        <PreviewComponent type={file.type as PreviewFileType} url={file.data} />
+
+        <X
+          className='absolute top-1 right-2 p-1 hover:bg-card rounded transition-all cursor-pointer'
+          onClick={() => setFile({ data: '', type: '', storagePath: '' })}
+        />
+      </div>
+
+      <input
+        className='h-full w-full resize-none rounded-md p-1 pl-[50px] pr-[100px] bg-background ring-1 ring-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring  '
+        ref={inputRef}
         value={message}
-        onChange={e => setMessage(e.target.value)}
-        className='h-full'
+        onChange={handleMessageChange}
       />
-      <Button className='h-full' disabled={!(message || image) || !_id}>
-        <Send />
-      </Button>
+      <div className='absolute w-[100px] h-full flex justify-start items-center gap-3 top-0 right-0'>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant='ghost' className=' px-2'>
+              <Paperclip className='' />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className='w-fit'>
+            <div>
+              <ul className='space-y-1'>
+                <li>
+                  <input
+                    type='file'
+                    ref={imageInputRef}
+                    onChange={e =>
+                      handleFileChange(
+                        e,
+                        'image',
+                        'images',
+                        1024 * 1024,
+                        'Image'
+                      )
+                    }
+                    className='hidden'
+                    id='image'
+                    accept='image/*'
+                  />
+                  <label
+                    htmlFor='image'
+                    className='cursor-pointer w-[100px] p-1 transition-all rounded hover:bg-muted flex justify-start gap-2 items-center'
+                  >
+                    <Image className='h-5 w-5' />
+                    Image
+                  </label>
+                </li>
+                <li className='cursor-pointer w-[100px] p-1 transition-all rounded hover:bg-muted flex justify-start gap-2 items-center'>
+                  <input
+                    type='file'
+                    ref={videoInputRef}
+                    onChange={e =>
+                      handleFileChange(
+                        e,
+                        'video',
+                        'videos',
+                        8 * 1024 * 1024,
+                        'Video'
+                      )
+                    }
+                    className='hidden'
+                    accept='video/*'
+                    id='video'
+                  />
+                  <label
+                    htmlFor='video'
+                    className='cursor-pointer w-[100px] p-1 transition-all rounded hover:bg-muted flex justify-start gap-2 items-center'
+                  >
+                    <Video className='h-5 w-5' />
+                    Video
+                  </label>
+                </li>
+              </ul>
+            </div>
+          </PopoverContent>
+        </Popover>
+        <Button
+          type='submit'
+          disabled={!message && !file.data}
+          variant={'ghost'}
+          className='px-2 hover:bg-muted'
+        >
+          <Send />
+        </Button>
+      </div>
     </form>
   )
 }

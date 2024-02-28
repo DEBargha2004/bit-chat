@@ -8,6 +8,7 @@ export default function Switch () {
     <Button
       variant='ghost'
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      className='h-full w-full'
     >
       {theme === 'dark' ? <SunMedium /> : <Moon />}
     </Button>

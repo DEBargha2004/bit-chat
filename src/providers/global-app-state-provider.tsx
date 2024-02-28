@@ -9,8 +9,10 @@ export type GlobalAppStateType = {
   setId: Dispatch<SetStateAction<string>>
   messages: MessageType[]
   setMessages: Dispatch<SetStateAction<MessageType[]>>
-  online_count: number
-  setOnlineCount: Dispatch<SetStateAction<number>>
+  onlineUsers: { [key: string]: { status: string; typing: boolean } }
+  setOnlineUsers: Dispatch<
+    SetStateAction<{ [key: string]: { status: string; typing: boolean } }>
+  >
 }
 
 export type MessageType = {
@@ -21,7 +23,7 @@ export type MessageType = {
 }
 
 export type MessageComponentType = {
-  type: 'text' | 'image'
+  type: 'text' | 'image' | 'video'
   data: string
 }
 
@@ -32,7 +34,9 @@ export default function GlobalAppStateProvider ({
 }) {
   const [_id, setId] = useState('')
   const [messages, setMessages] = useState<MessageType[]>([])
-  const [online_count, setOnlineCount] = useState(0)
+  const [onlineUsers, setOnlineUsers] = useState<
+    GlobalAppStateType['onlineUsers']
+  >({})
   return (
     <GlobalAppContext.Provider
       value={{
@@ -40,8 +44,8 @@ export default function GlobalAppStateProvider ({
         setId,
         messages,
         setMessages,
-        online_count,
-        setOnlineCount
+        onlineUsers,
+        setOnlineUsers
       }}
     >
       {children}
